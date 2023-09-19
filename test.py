@@ -65,12 +65,23 @@ class TestApp(EClient, EWrapper):
     def tickByTickBidAsk(self, reqId: int, time: int, bidPrice: float, askPrice: float,
                      bidSize: Decimal, askSize: Decimal, tickAttribBidAsk):
         super().tickByTickBidAsk(reqId, time, bidPrice, askPrice, bidSize, askSize, tickAttribBidAsk)
-        print("BidAsk. ReqId:", reqId,
-              "Symbol:", self.reqTickerMapper[reqId], 
-            "Time:", datetime.datetime.fromtimestamp(time).strftime("%Y%m%d-%H:%M:%S"),
-            "BidPrice:", str(bidPrice), "AskPrice:", str(askPrice),
-            "BidSize:", str(bidSize), "AskSize:", str(askSize),
-            "BidPastLow:", tickAttribBidAsk.bidPastLow, "AskPastHigh:", tickAttribBidAsk.askPastHigh)
+        # print("BidAsk. ReqId:", reqId,
+        #       "Symbol:", self.reqTickerMapper[reqId], 
+        #     "Time:", datetime.datetime.fromtimestamp(time).strftime("%Y%m%d-%H:%M:%S"),
+        #     "BidPrice:", str(bidPrice), "AskPrice:", str(askPrice),
+        #     "BidSize:", str(bidSize), "AskSize:", str(askSize),
+        #     "BidPastLow:", tickAttribBidAsk.bidPastLow, "AskPastHigh:", tickAttribBidAsk.askPastHigh)
+        msg = {
+                "Time": datetime.datetime.fromtimestamp(time).strftime("%Y%m%d-%H:%M:%S"),
+                "Symbol": self.reqTickerMapper[reqId],
+                "BidPrice": str(bidPrice),
+                "AskPrice": str(askPrice),
+                "BidSize": str(bidSize),
+                "AskSize": str(askSize),
+                "BidPastLow": str(tickAttribBidAsk.bidPastLow),
+                "AskPastHigh": str(tickAttribBidAsk.askPastHigh)
+                }
+        redis_client.publish(self.reqTickerMapper[reqId], json.dumps(msg))
 
     def updateMktDepthL2(self, reqId: TickerId, position: int, marketMaker: str,
                          operation: int, side: int, price: float, size: Decimal, isSmartDepth: bool):
