@@ -10,6 +10,7 @@ import json
 
 redis_client = redis.Redis(host="127.0.0.1", port=6379, db=0, password="p@ss$12E45")
 sub = redis_client.pubsub()
+orderIdMap = {}
 sub.subscribe( 'order-execution')
 
 class IBapi(EWrapper, EClient):
@@ -21,11 +22,24 @@ class IBapi(EWrapper, EClient):
 		self.nextorderId = orderId
 		print('The next valid order id is: ', self.nextorderId)
 
-	def orderStatus(self, orderId, status, filled, remaining, avgFullPrice, permId, parentId, lastFillPrice, clientId, whyHeld, mktCapPrice):
-		print('orderStatus - orderid:', orderId, 'status:', status, 'filled', filled, 'remaining', remaining, 'lastFillPrice', lastFillPrice)
+	def orderStatus(self, orderId, status, filled, remaining, avgFillPrice, permId, parentId, lastFillPrice, clientId, whyHeld, mktCapPrice):
+		print('orderStatus - orderid:', orderId, "Symbol", orderIdMap[orderId]["Symbol"], 'status:', status, 'filled', filled, 'remaining', remaining, 'lastFillPrice', lastFillPrice)
+		msg = {
+			"status": status,
+			"RemainingQuantity": remaining,
+			"FilledQuantity": filled,
+			"Symbol": orderIdMap[orderId]["Symbol"],
+			"Action": orderIdMap[orderId]["Action"],
+			"AvgFillPrice": avgFillPrice
+		}
+		redis_client.publish(orderIdMap[orderId]["Symbol"] + "-status", json.dumps(msg))
 	
 	def openOrder(self, orderId, contract, order, orderState):
 		print('openOrder id:', orderId, contract.symbol, contract.secType, '@', contract.exchange, ':', order.action, order.orderType, order.totalQuantity, orderState.status)
+		orderIdMap[orderId] = {
+			"Symbol": contract.symbol,
+			"Action": order.action
+		}
 
 	def execDetails(self, reqId, contract, execution):
 		print('Order Executed: ', reqId, contract.symbol, contract.secType, contract.currency, execution.execId, execution.orderId, execution.shares, execution.lastLiquidity)
@@ -70,22 +84,27 @@ while True:
 		print('waiting for connection')
 		time.sleep(1)
 
-for raw_message in sub.listen():
-    if raw_message["type"] != "message":
-        continue
-    # print(raw_message)
-    message = json.loads(raw_message["data"])
-    if(message):
-        order = Order()
-        order.action = message["action"].upper()
-        order.totalQuantity = message["quantity"]
-        order.orderType = message["order_type"].upper()
-        order.lmtPrice = message["price"]
-        order.eTradeOnly = False
-        order.firmQuoteOnly = False
 
-        app.placeOrder(app.nextorderId, Stock_order(message["symbol"]), order)
-        break
+counter = 0
+for raw_message in sub.listen():
+	if raw_message["type"] != "message":
+		continue
+	# print(raw_message)
+	message = json.loads(raw_message["data"])
+	if(message):
+		order = Order()
+		order.action = message["action"].upper()
+		order.totalQuantity = message["quantity"]
+		order.orderType = message["order_type"].upper()
+		order.lmtPrice = message["price"]
+		order.eTradeOnly = False
+		order.firmQuoteOnly = False
+
+		app.placeOrder(app.nextorderId, Stock_order(message["symbol"]), order)
+		app.nextorderId += 1
+		# counter += 1
+		# if(counter > 100):
+		# 	break
 
 #Create order object
 # order = Order()
